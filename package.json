@@ -1,0 +1,24 @@
+{
+  "name": "trenitalia-open-api",
+  "version": "0.5.0",
+  "description": "Making Trenitalia closed API more accessible",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  },
+  "keywords": [
+    "Trenitalia",
+    "API",
+    "Open API",
+    "Open data"
+  ],
+  "author": "geektek",
+  "license": "MIT",
+  "devDependencies": {
+    "axios": "^1.13.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  }
+}
