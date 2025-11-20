@@ -1,12 +1,15 @@
 {
   "name": "trenitalia-open-api",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Making Trenitalia closed API more accessible",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "repository": {
     "url": "https://github.com/Geek-Tek/trenitalia-open-api"
+  },
+  "dependencies": {
+    "axios": "^1.13.1"
   },
   "scripts": {
     "build": "tsup"

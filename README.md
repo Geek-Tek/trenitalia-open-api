@@ -8,7 +8,7 @@ With Trenitalia open API, you can build your own train visualizer and real time 
 
 <br/>
 
-You can download the package from npmjs or find it on [GitHub](https://github.com/Geek-Tek/trenitalia-open-api 'trenitalia-open-api') and help me there.
+You can download the package from [npmjs](https://www.npmjs.com/package/trenitalia-open-api) or find it on [GitHub](https://github.com/Geek-Tek/trenitalia-open-api 'trenitalia-open-api') and help me there.
 
 Something useful to develop further could be:
 - npm documentation
