@@ -6,14 +6,19 @@ import axios from 'axios'
  *  Returns all the train stations with their ID and location
  *
  * @export
+ * @param {boolean} [visible=false] return only stations with correct map coordinates
  * @return {*} {Promise<mapStation[]>} if empty it could be a server error or a change in the server API
  */
-export async function getAllStations(): Promise<mapStation[]> {
+export async function getAllStations(visible: boolean = false): Promise<mapStation[]> {
     try {
         const response = await axios.get('http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/elencoStazioni/0')
 
         if (response.status === 200) {
-            return response.data.map((el: any) => {
+            var data = response.data
+            if (visible) {
+                data = response.data.filter((el: any) => el.dettZoomStaz.length > 0)
+            }
+            return data.map((el: any) => {
                 return {
                     stationId: el.codStazione,
                     name: el.localita.nomeLungo,
