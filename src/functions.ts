@@ -202,7 +202,7 @@ export async function getTrainStopsInfo(trainNumber: number | string, stationIdA
 
         if (res.status === 200) {
             return res.data.map((el: any) => {
-                console.log(el)
+                // console.log(el)
                 return {
                     stationId: el.id,
                     name: el.stazione,
@@ -233,7 +233,7 @@ export async function getTrainStopsInfo(trainNumber: number | string, stationIdA
  * @export
  * @param {(number | string)} trainNumber the train number
  * @param {string} [stationIdA] id of the departure station. If not provided, it will be searched
- * @param {number} [segmentN=0] if more trains share the same id, specifies which train is desired
+ * @param {number} [segmentN=0] if more trains share the same id, specifies which train is desired (by default the first suggested by Trenitalia)
  * @return {*} {Promise<any>} reformatted train info with its stops
  */
 export async function getTrainInfo(trainNumber: number | string, stationIdA?: string, segmentN: number = 0): Promise<any> {
@@ -281,8 +281,13 @@ export async function getTrainInfo(trainNumber: number | string, stationIdA?: st
         return err
     }
 }
-
-export async function getMobilityInfo() {
+/**
+ * If there are strikes or binary obstructions, they will be listed here
+ *
+ * @export
+ * @return {*} {Promise<string[]>} list of all info provided
+ */
+export async function getMobilityInfo(): Promise<string[]> {
     try {
         const res = await axios.get('http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/infomobilitaRSSBox/false')
         if (res.status === 200) {
@@ -294,6 +299,6 @@ export async function getMobilityInfo() {
         }
     } catch(err) {
         console.log(err)
-        return err
+        return []
     }
 }
