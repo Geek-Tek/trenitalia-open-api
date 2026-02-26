@@ -281,3 +281,19 @@ export async function getTrainInfo(trainNumber: number | string, stationIdA?: st
         return err
     }
 }
+
+export async function getMobilityInfo() {
+    try {
+        const res = await axios.get('http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/infomobilitaRSSBox/false')
+        if (res.status === 200) {
+            const infoList = (res.data as string).split(/\n/).filter((info, index) => index % 2 === 1)
+            const infos = infoList.map(info => info.split('>')[1].split("<")[0])
+            return infos
+        } else {
+            throw 'code not 200'
+        }
+    } catch(err) {
+        console.log(err)
+        return err
+    }
+}
