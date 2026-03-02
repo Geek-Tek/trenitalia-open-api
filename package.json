@@ -1,6 +1,6 @@
 {
   "name": "trenitalia-open-api",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Making Trenitalia closed API more accessible",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

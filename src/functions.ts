@@ -1,15 +1,15 @@
-import { mapStation, mapSegment, trainStopInfo } from "./types"
+import { station, mapSegment, trainStopInfo, trainInfo } from "./types"
 
 import axios from 'axios'
 
 /**
- *  Returns all the train stations with their ID and location
+ *  Returns all the train stations with their ID and location (usually regId = 0 even if it's not)
  *
  * @export
  * @param {boolean} [visible=false] return only stations with correct map coordinates
- * @return {*} {Promise<mapStation[]>} if empty it could be a server error or a change in the server API
+ * @return {*} {Promise<station[]>} if empty it could be a server error or a change in the server API
  */
-export async function getAllStations(visible: boolean = false): Promise<mapStation[]> {
+export async function getAllStations(visible: boolean = false): Promise<station[]> {
     try {
         const response = await axios.get('http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/elencoStazioni/0')
 
@@ -18,14 +18,7 @@ export async function getAllStations(visible: boolean = false): Promise<mapStati
             if (visible) {
                 data = response.data.filter((el: any) => el.dettZoomStaz.length > 0)
             }
-            return data.map((el: any) => {
-                return {
-                    stationId: el.codStazione,
-                    name: el.localita.nomeLungo,
-                    city: el.nomeCitta,
-                    location: [el.lat, el.lon]
-                }
-            })
+            return data.map(formatStationInfo)
         } else {
             throw `Status Code: ${response.status} - ${response.statusText}`
         }
@@ -34,6 +27,17 @@ export async function getAllStations(visible: boolean = false): Promise<mapStati
         return []
     }
 }
+
+function formatStationInfo(station: any): station {
+    return {
+        stationId: station.codStazione,
+        regionId: station.codReg,
+        name: station.localita.nomeLungo,
+        city: station.nomeCitta,
+        location: [station.lat, station.lon]
+    }
+}
+
 /**
  *  Returns all the segments a train can travel through
  *
@@ -82,9 +86,9 @@ export async function getAllSegments(unique: boolean = false, busy: boolean = fa
  *  This function returns all the trains travelling in this moment through the FS's lines
  * 
  *  @export
- *  @return {*} a list of trains
+ *  @return {*} {Promise<trainInfo[]>} - a list of trains infos
  */
-export async function getAllTrains(): Promise<any> {
+export async function getAllTrains(): Promise<trainInfo[]> {
     try {
         const segments = await getAllSegments(true) // getting only the unique lines so we avoid spamming ViaggiaTreno's server too much
 
@@ -93,30 +97,7 @@ export async function getAllTrains(): Promise<any> {
             const data = response.map((el: any) => {
                 return el.data.map((tr: any) => tr.treni).flat()
             }).flat()
-            return data.filter((el: any) => !el.arrivato || !el.nonPartito).map((el: any) => {
-                const [hours, minutes] = el.compDurata.split(':')
-                const durataMin = (Number(hours) * 60) + Number(minutes)
-                const newData = {
-                    departed: !el.nonPartito,
-                    arrived: el.arrivato,
-                    travelling: el.circolante,
-                    inStation: el.inStazione,
-                    departureTime: el.dataPartenzaTreno,
-                    segmentId: el.tratta,
-                    regionId: el.regione,
-                    trainCategory: el.categoria !== "" ? el.categoria : el.compNumeroTreno.trim().split(' ')[0], // For some reason, FR trains do not have a category, nor a category description, and have a space BEFORE the completed train number (e.g. " FR 9516")
-                    trainNumber: el.numeroTreno,
-                    changingNumber: el.haCambiNumero,
-                    stationA: el.origine,
-                    stationIdA: el.codOrigine,
-                    stationB: el.destinazione,
-                    stationIdB: el.codDestinazione,
-                    travelDuration: durataMin,
-                    delay: el.ritardo,
-                    latestDetection: el.ultimoRilev,
-                }
-                return newData
-            })
+            return data.filter((el: any) => !el.arrivato || !el.nonPartito).map(parseTrainInfo) // filtering travelling trains
         })
 
         const noDuplicates = Array.from(
@@ -128,7 +109,7 @@ export async function getAllTrains(): Promise<any> {
         return noDuplicates
     } catch (err) {
         console.log(err)
-        return err
+        return []
     }
 }
 /**
@@ -202,7 +183,6 @@ export async function getTrainStopsInfo(trainNumber: number | string, stationIdA
 
         if (res.status === 200) {
             return res.data.map((el: any) => {
-                // console.log(el)
                 return {
                     stationId: el.id,
                     name: el.stazione,
@@ -262,7 +242,7 @@ export async function getTrainInfo(trainNumber: number | string, stationIdA?: st
                             delayAtDeparture: st.partenzaReale ? st.ritardoPartenza : undefined,
                             isFirstStop: st.tipoFermata === 'P',
                             isLastStop: st.tipoFermata === 'A',
-                            isCurrentStop: st.actualFermataType === 1 && (el.fermate[index +1].actualFermataType === 0 || !el.fermate[index +1]), // I'm not sure about this one, but I've noticed a change in this value when the train is in station
+                            isCurrentStop: st.actualFermataType === 1 && (!el.fermate[index +1] || el.fermate[index +1].actualFermataType === 0), // I'm not sure about this one, but I've noticed a change in this value when the train is in station
                             expectedArrival: st.arrivo_teorico,
                             actualArrival: st.arrivoReale,
                             expectedDeparture: st.partenza_teorica,
@@ -301,4 +281,102 @@ export async function getMobilityInfo(): Promise<string[]> {
         console.log(err)
         return []
     }
+}
+/**
+ * Return some station info, or null if no station was found with that code
+ *
+ * @export
+ * @param {string} stationId - The station code / id
+ * @param {number} [regionId] - The station region code / id, if not provided it will be retrived via another get request (see getStationRegionId())
+ * @return {*}  {(Promise<station | null>)}
+ */
+export async function getStationInfo(stationId: string, regionId?: number): Promise<station | null> {
+    try {
+        regionId = regionId ?? await getStationRegionId(stationId)
+        if (regionId == -1) {
+            return null
+        } else {
+            const info = await axios.get(`http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/dettaglioStazione/${stationId}/${regionId}`)
+            if (info.status === 200) {
+                return formatStationInfo(info.data)
+            } else {
+                throw 'code not 200'
+            }
+        }
+    } catch(err) {
+        return null
+    }
+}
+
+// REVIEW - These next two functions can be merged in one, like getStationTables()
+
+/**
+ * Get all trains departing from one specific station (no regionId needed)
+ *
+ * @export
+ * @param {string} stationId - The station code / id
+ * @return {*}  {Promise<trainInfo[]>} - An array of train infos about their travel status regarding the selected station (if interested in more infos, see getTrainInfo())
+ */
+export async function getDepartures(stationId: string): Promise<trainInfo[]> {
+    // TODO - could be improved with iechub.rfi.it (more trains, more infos but defect-rounded delays and a long waiting)
+    try {
+        const dep = await axios.get(`http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/partenze/${stationId}/${new Date()}`)
+        if (dep.status === 200) {
+            return dep.data.map(parseTrainInfo)
+        } else {
+            throw 'code not 200'
+        }
+    } catch(err) {
+        console.log(err)
+        return []
+    }
+}
+/**
+ * Get all trains arriving to one specific station (no regionId needed)
+ *
+ * @export
+ * @param {string} stationId - The station code / id
+ * @return {*}  {Promise<trainInfo[]>} - An array of train infos about their travel status regarding the selected station (if interested in more infos, see getTrainInfo())
+ */
+export async function getArrivals(stationId: string): Promise<trainInfo[]> {
+    // TODO - could be improved with iechub.rfi.it (more trains, more infos but defect-rounded delays and a long waiting)
+    try {
+        const arr = await axios.get(`http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/arrivi/${stationId}/${new Date()}`)
+        if (arr.status === 200) {
+            return arr.data.map(parseTrainInfo)
+        } else {
+            throw 'code not 200'
+        }
+    } catch (err) {
+        return []
+    }
+}
+
+function parseTrainInfo(train: any): trainInfo {
+    const [hours, minutes] = train.compDurata.split(':')
+    const durataMin = (Number(hours) * 60) + Number(minutes)
+
+    const details = {
+        departed: !train.nonPartito,
+        arrived: train.arrivato,
+        travelling: train.circolante,
+        inStation: train.inStazione,
+        departureTime: train.orarioPartenza,
+        arrivalTime: train.orarioArrivo,
+        segmentId: train.tratta,
+        regionId: train.regione,
+        trainCategory: train.categoria !== '' ? train.categoria : train.compNumeroTreno.split(' ')[1], // For some reason, FR trains do not have a category, nor a category description, and have a space BEFORE the completed train number (e.g. " FR 9516")
+        trainNumber: train.numeroTreno,
+        changingNumber: train.haCambiNumero,
+        stationA: train.origine,
+        stationIdA: train.codOrigine,
+        stationB: train.destinazione,
+        stationIdB: train.codDestinazione,
+        travelDuration: train.compDurata === '' ? null : durataMin,
+        delay: train.ritardo,
+        latestDetection: train.ultimoRilev,
+        expectedPlatform: train.binarioProgrammatoPartenzaDescrizione ?? train.binarioProgrammatoArrivoDescrizione,
+        actualPlatform: train.binarioEffettivoPartenzaDescrizione ?? train.binarioEffettivoArrivoDescrizione,
+    }
+    return details
 }
